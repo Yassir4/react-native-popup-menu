@@ -10,6 +10,7 @@
     "format": "prettier --check ./src"
   },
   "dependencies": {
+    "@gorhom/portal": "^1.0.12",
     "@react-navigation/native": "^6.0.6",
     "@react-navigation/native-stack": "^6.2.5",
     "expo": "~44.0.2",
