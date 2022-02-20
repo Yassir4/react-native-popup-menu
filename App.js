@@ -1,24 +1,37 @@
 import * as React from "react";
-import { View, Text } from "react-native";
+import { View, Text, TextInput } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { PortalHost, PortalProvider } from "@gorhom/portal";
-import Menu from "./src/components/MenuPopup";
+import Menu, { MenuItem } from "./src/components/MenuPopup";
 
 function HomeScreen() {
   return (
     <View style={{ flex: 1 }}>
-      {/* <Text>Home Screen</Text> */}
+      <TextInput style={{ width: 100, height: 20, backgroundColor: "red" }} />
       <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
         {Array(100)
           .fill("1")
           .map(() => (
             <View style={{ padding: 15 }}>
               <Menu trigger={<Text>press here</Text>}>
-                <Text>holla amigo</Text>
-                <Text>holla amigo</Text>
-                <Text>holla amigo</Text>
-                <Text>holla amigo</Text>
+                <MenuItem
+                  text={"Title"}
+                  onPress={() => console.log("option pressed")}
+                />
+                <MenuItem
+                  text={"Recently Added"}
+                  onPress={() => console.log("option pressed")}
+                />
+                <MenuItem
+                  text={"Recently Played"}
+                  onPress={() => console.log("option pressed")}
+                />
+                <MenuItem
+                  text={"Playlist type"}
+                  onPress={() => console.log("option pressed")}
+                  lastItem
+                />
               </Menu>
             </View>
           ))}

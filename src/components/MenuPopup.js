@@ -6,9 +6,10 @@ import {
   Platform,
   Dimensions,
   TouchableOpacity,
+  Text,
 } from "react-native";
 import { Portal } from "@gorhom/portal";
-
+import useKeyboardHeight from "./useKeyboardHeight";
 const { width: layoutWidth, height: layoutHeight } = Dimensions.get("window");
 
 const isIOS = Platform.OS === "ios";
@@ -24,8 +25,8 @@ const MenuWrapper = ({ trigger, children }) => {
     height: 0,
   });
 
-  // const { keyboardHeight } = useKeyboardHeight();
-  const keyboardHeight = 0;
+  const { keyboardHeight } = useKeyboardHeight();
+
   const [modalDimensions, setModalDimensions] = useState({
     width: 0,
     height: 0,
@@ -36,6 +37,7 @@ const MenuWrapper = ({ trigger, children }) => {
       zIndex: 10,
       // backgroundColor: "red",
     },
+
     button: {
       width: "auto",
       alignSelf: "center",
@@ -45,7 +47,7 @@ const MenuWrapper = ({ trigger, children }) => {
         ios: {
           backgroundColor: "green",
           alignSelf: "flex-start",
-          maxWidth: layoutWidth * 0.7,
+          width: layoutWidth * 0.5,
 
           borderRadius: 13,
           shadowColor: "#000",
@@ -120,9 +122,21 @@ const MenuWrapper = ({ trigger, children }) => {
   if (isIOS) {
     const initialTriggerTop =
       activeSectionPosition.top + activeSectionPosition.height;
-    if (modalDimensions.height + initialTriggerTop > layoutHeight)
+    // if the menu is outside the screen from the top
+    if (
+      modalDimensions.height + initialTriggerTop >
+      layoutHeight - keyboardHeight
+    )
       top = activeSectionPosition.top - modalDimensions.height;
     else top = activeSectionPosition.top + activeSectionPosition.height;
+    // if menu is outside the screen from the right
+    if (activeSectionPosition.left - modalDimensions.width < 0)
+      left = activeSectionPosition.left;
+    else
+      left =
+        activeSectionPosition.left -
+        modalDimensions.width +
+        activeSectionPosition.width;
   }
 
   const activeStyles =
@@ -153,9 +167,9 @@ const MenuWrapper = ({ trigger, children }) => {
           >
             <View
               style={[
+                styles.activeSection,
                 activeStyles,
                 {
-                  padding: 10,
                   backgroundColor: "white",
                   alignSelf: "flex-start",
                 },
@@ -163,15 +177,45 @@ const MenuWrapper = ({ trigger, children }) => {
               collapsable={false}
               ref={activeSectionRef}
             >
-              <View style={styles.overlay}>
-                {/* <MenuContext.Provider value={{ closeModal }}> */}
-                {children}
+              {/* <MenuContext.Provider value={{ closeModal }}> */}
+              {children}
 
-                {/* </MenuContext.Provider> */}
-              </View>
+              {/* </MenuContext.Provider> */}
             </View>
           </TouchableOpacity>
         </Portal>
+      )}
+    </>
+  );
+};
+
+export const MenuItem = ({ style, lastItem, text, onPress }) => {
+  const styles = StyleSheet.create({
+    body: {
+      padding: 10,
+    },
+  });
+  return (
+    <>
+      <Pressable onPress={onPress} style={styles.body}>
+        <Text
+          numberOfLines={1}
+          // style={styles.text}
+        >
+          {text}
+        </Text>
+      </Pressable>
+      {!lastItem && (
+        <View
+          style={{
+            ...Platform.select({
+              ios: {
+                borderBottomWidth: !lastItem ? StyleSheet.hairlineWidth : 0,
+                borderColor: "rgba(17, 17, 17, 0.5)",
+              },
+            }),
+          }}
+        />
       )}
     </>
   );
