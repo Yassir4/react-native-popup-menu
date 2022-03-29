@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Pressable,
@@ -7,35 +7,37 @@ import {
   Dimensions,
   TouchableOpacity,
   Text,
+  StatusBar,
+  Animated,
 } from "react-native";
 import { Portal } from "@gorhom/portal";
 import useKeyboardHeight from "./useKeyboardHeight";
+
 const { width: layoutWidth, height: layoutHeight } = Dimensions.get("window");
 
 const isIOS = Platform.OS === "ios";
-const MenuWrapper = ({ trigger, children }) => {
-  const viewRef = useRef(null);
-  const activeSectionRef = useRef(null);
-  const [modalVisible, setModalVisible] = useState(false);
+const Menu = ({ trigger, children }) => {
+  const triggerWrapperRef = useRef(null);
+  const itemsWrapperRef = useRef(null);
+  const [menuVisible, setMenuVisible] = useState(false);
 
-  const [activeSectionPosition, setActiveSectionPosition] = useState({
+  const [triggerDimensions, setTriggerDimensions] = useState({
     top: 0,
     left: 0,
+    width: 0,
+    height: 0,
+  });
+  const [modalDimensions, setModalDimensions] = useState({
     width: 0,
     height: 0,
   });
 
   const { keyboardHeight } = useKeyboardHeight();
 
-  const [modalDimensions, setModalDimensions] = useState({
-    width: 0,
-    height: 0,
-  });
   const styles = StyleSheet.create({
     modalWrapper: {
       ...StyleSheet.absoluteFillObject,
       zIndex: 10,
-      // backgroundColor: "red",
     },
 
     button: {
@@ -43,9 +45,10 @@ const MenuWrapper = ({ trigger, children }) => {
       alignSelf: "center",
     },
     activeSection: {
+      backgroundColor: "white",
+      alignSelf: "flex-start",
       ...Platform.select({
         ios: {
-          backgroundColor: "green",
           alignSelf: "flex-start",
           width: layoutWidth * 0.5,
 
@@ -65,7 +68,7 @@ const MenuWrapper = ({ trigger, children }) => {
         },
       }),
       opacity:
-        modalDimensions.width !== 0 && activeSectionPosition.left !== 0 ? 1 : 0,
+        modalDimensions.width !== 0 && triggerDimensions.left !== 0 ? 1 : 0,
       zIndex: 99,
     },
     overlay: {
@@ -76,149 +79,135 @@ const MenuWrapper = ({ trigger, children }) => {
       }),
     },
   });
+  const fadeAnim = useRef(new Animated.Value(0)).current; // Initial value for opacity: 0
 
-  const savePosition = (ref) => {
-    ref?.current?.measureInWindow((x, y, width, height) => {
-      const left = x;
-
-      setActiveSectionPosition({
+  const calculateDimensions = () => {
+    triggerWrapperRef?.current?.measureInWindow((x, y, width, height) => {
+      setTriggerDimensions({
         top: Math.max(y, 0),
-        left,
+        left: x,
         width,
         height,
       });
     });
+
+    setTimeout(() => {
+      itemsWrapperRef?.current?.measureInWindow((x, y, width, height) => {
+        setModalDimensions({ width, height });
+      });
+    }, 100);
   };
 
-  const isVisible = modalVisible;
-
   useEffect(() => {
-    if (isVisible) {
-      setTimeout(() => {
-        if (viewRef?.current) savePosition(viewRef);
-      }, 200);
+    if (menuVisible) {
+      if (triggerWrapperRef?.current) calculateDimensions();
     }
-  }, [isVisible]);
-
-  useEffect(() => {
-    if (activeSectionRef && modalDimensions.width === 0)
-      setTimeout(() => {
-        activeSectionRef.current?.measureInWindow((x, y, width, height) => {
-          setModalDimensions({ width, height });
-        });
-      }, 200);
-  }, [isVisible, activeSectionRef, setModalDimensions, modalDimensions]);
+  }, [menuVisible, itemsWrapperRef, setModalDimensions]);
 
   const closeModal = () => {
-    setModalVisible(false);
+    setMenuVisible(false);
     setModalDimensions({ width: 0, height: 0 });
-    setActiveSectionPosition({ top: 0, left: 0, width: 0, height: 0 });
+    setTriggerDimensions({ top: 0, left: 0, width: 0, height: 0 });
   };
 
-  let left = 0;
+  const { top, left } = useMemo(() => {
+    let left = 0;
+    let top = 0;
 
-  let top = null;
+    left =
+      triggerDimensions.left - modalDimensions.width + triggerDimensions.width;
+    // if the popup is outside the screen from the left
+    if (triggerDimensions.left - modalDimensions.width < 0)
+      left = triggerDimensions.left;
 
-  if (isIOS) {
-    const initialTriggerTop =
-      activeSectionPosition.top + activeSectionPosition.height;
-    // if the menu is outside the screen from the top
-    if (
-      modalDimensions.height + initialTriggerTop >
-      layoutHeight - keyboardHeight
-    )
-      top = activeSectionPosition.top - modalDimensions.height;
-    else top = activeSectionPosition.top + activeSectionPosition.height;
-    // if menu is outside the screen from the right
-    if (activeSectionPosition.left - modalDimensions.width < 0)
-      left = activeSectionPosition.left;
-    else
-      left =
-        activeSectionPosition.left -
-        modalDimensions.width +
-        activeSectionPosition.width;
-  }
+    if (isIOS) {
+      const initialTriggerTop =
+        triggerDimensions.top + triggerDimensions.height + 10;
+      if (
+        modalDimensions.height + initialTriggerTop >
+        layoutHeight - keyboardHeight
+      )
+        top = triggerDimensions.top - modalDimensions.height - 10;
+      else top = initialTriggerTop;
+    } else {
+      const initialTriggerTop =
+        triggerDimensions.top +
+        triggerDimensions.height +
+        StatusBar.currentHeight;
 
-  const activeStyles =
-    top !== null ? { left, top } : { left, bottom: 0, marginBottom: 5 };
-  console.log({
-    top,
-    left,
-  });
+      top =
+        initialTriggerTop + modalDimensions.height >
+        layoutHeight - keyboardHeight
+          ? initialTriggerTop -
+            triggerDimensions.height -
+            modalDimensions.height
+          : initialTriggerTop;
+    }
+
+    return { top, left };
+  }, [modalDimensions, triggerDimensions, keyboardHeight]);
+
+  const menuPositionStyles = { left, top };
+
   return (
     <>
-      {!!trigger && (
-        <Pressable
-          style={[styles.button]}
-          onPress={() => {
-            setModalVisible(true);
-          }}
-          ref={viewRef}
-        >
-          {trigger}
-        </Pressable>
-      )}
-      {modalVisible && (
-        <Portal hostName="menu">
+      <Pressable
+        onPress={() => {
+          setMenuVisible(true);
+        }}
+        ref={triggerWrapperRef}
+      >
+        {trigger}
+      </Pressable>
+      <Portal hostName="menu">
+        {menuVisible && (
           <TouchableOpacity
             activeOpacity={1}
             onPress={closeModal}
             style={styles.modalWrapper}
           >
-            <View
-              style={[
-                styles.activeSection,
-                activeStyles,
-                {
-                  backgroundColor: "white",
-                  alignSelf: "flex-start",
-                },
-              ]}
+            <Animated.View
+              style={[styles.activeSection, menuPositionStyles]}
               collapsable={false}
-              ref={activeSectionRef}
+              ref={itemsWrapperRef}
             >
-              {/* <MenuContext.Provider value={{ closeModal }}> */}
-              {children}
-
-              {/* </MenuContext.Provider> */}
-            </View>
+              {/* pass the closeModal to children prop  */}
+              {Array.isArray(children)
+                ? children.map((childrenItem) => {
+                    return React.cloneElement(childrenItem, {
+                      closeModal,
+                    });
+                  })
+                : React.cloneElement(children, {
+                    closeModal,
+                  })}
+            </Animated.View>
           </TouchableOpacity>
-        </Portal>
-      )}
+        )}
+      </Portal>
     </>
   );
 };
 
-export const MenuItem = ({ style, lastItem, text, onPress }) => {
+export const MenuItem = ({ text, onPress, closeModal }) => {
   const styles = StyleSheet.create({
     body: {
       padding: 10,
     },
   });
+
+  const handleOnPress = () => {
+    onPress();
+    closeModal();
+  };
+
   return (
     <>
-      <Pressable onPress={onPress} style={styles.body}>
-        <Text
-          numberOfLines={1}
-          // style={styles.text}
-        >
-          {text}
-        </Text>
+      <Pressable onPress={handleOnPress} style={styles.body}>
+        <Text numberOfLines={1}>{text}</Text>
       </Pressable>
-      {!lastItem && (
-        <View
-          style={{
-            ...Platform.select({
-              ios: {
-                borderBottomWidth: !lastItem ? StyleSheet.hairlineWidth : 0,
-                borderColor: "rgba(17, 17, 17, 0.5)",
-              },
-            }),
-          }}
-        />
-      )}
     </>
   );
 };
 
-export default MenuWrapper;
+export default Menu;
